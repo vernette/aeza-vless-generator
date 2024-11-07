@@ -9,8 +9,7 @@ CURL_RETRY_DELAY=2
 
 log_message() {
   local log_level="$1"
-  shift
-  local message="$*"
+  local message="${*:2}"
   local timestamp
   timestamp=$(date +"%Y-%m-%d %H:%M:%S")
   echo "[$timestamp] [$log_level] $message" | tee -a log.txt
