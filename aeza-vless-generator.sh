@@ -135,8 +135,41 @@ get_account_token() {
   jq -r '.response.token' <<<"$response"
 }
 
+get_free_locations_list() {
+  response=$(curl_request "https://api.aeza-security.net/v2/locations" "GET" "" "$USER_AGENT")
+  free_locations=($(echo "$response" | jq -r '.response | to_entries | map(select(.value.free == true)) | .[].key'))
+  echo "${free_locations[@]}"
+}
+
+select_location() {
+  free_locations=($(get_free_locations_list))
+
+  if [[ ${#free_locations[@]} -eq 0 ]]; then
+    return 1
+  fi
+
+  locations_with_extra=("${free_locations[@]}" "random" "exit")
+
+  select location in "${locations_with_extra[@]}"; do
+    if [[ "$location" == "Exit" ]]; then
+      return 1
+    elif [[ "$location" == "Random" ]]; then
+      random_location=${free_locations[$((RANDOM % ${#free_locations[@]}))]}
+      echo "$random_location"
+      break
+    elif [[ -n "$location" ]]; then
+      echo "$location"
+      break
+    fi
+  done
+}
+
 main() {
   log_message "INFO" "Starting script"
+
+  selected_location=$(select_location)
+  log_message "INFO" "Selected location: $selected_location"
+
   email=$(get_email)
   log_message "INFO" "Generated email: $email"
 
@@ -156,6 +189,8 @@ main() {
   fi
 
   token=$(get_account_token "$email" "$confirmation_code")
+  log_message "INFO" "Account token obtained successfully: $token"
+
   log_message "INFO" "Script finished successfully"
 }
 
