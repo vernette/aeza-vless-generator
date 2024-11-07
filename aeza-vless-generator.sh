@@ -15,18 +15,29 @@ log_message() {
   echo "[$timestamp] [$log_level] $message" | tee -a log.txt
 }
 
+process_json() {
+  local response="$1"
+  local filter="$2"
+
+  if [[ -z "$response" ]]; then
+    log_message "ERROR" "Empty response received"
+    return 1
+  fi
+
+  echo "$response" | jq empty &>/dev/null
+  if [[ $? -ne 0 ]]; then
+    log_message "ERROR" "Invalid JSON response: $response"
+    return 1
+  fi
+
+  echo "$response" | jq -r "$filter"
+}
+
 curl_request() {
   local url="$1"
   local method="$2"
   local data="${3:-}"
   local user_agent="${4:-}"
-  shift 4
-
-  headers=("-H" "Content-Type: application/json")
-  while (($# > 0)); do
-    headers+=("-H" "$1")
-    shift
-  done
 
   response=$(curl -s --connect-timeout "$CURL_TIMEOUT" \
     --max-time "$CURL_TIMEOUT" \
@@ -35,12 +46,10 @@ curl_request() {
     --retry-max-time "$CURL_TIMEOUT" \
     -X "$method" "$url" \
     ${user_agent:+-A "$user_agent"} \
-    "${headers[@]}" \
+    -H "Content-Type: application/json" \
     ${data:+-d "$data"})
 
-  return_code=$?
-
-  if [[ $return_code -ne 0 ]]; then
+  if [[ $? -ne 0 ]]; then
     log_message "ERROR" "Failed to execute curl request to $url after $CURL_RETRY retries"
     exit 1
   fi
@@ -51,7 +60,7 @@ curl_request() {
 get_email() {
   local response
   response=$(curl_request "$EMAIL_API_ENDPOINT/new" "POST")
-  jq -r '.email' <<<"$response"
+  process_json "$response" '.email'
 }
 
 send_confirmation_code() {
@@ -60,8 +69,8 @@ send_confirmation_code() {
   local data="{\"email\":\"$1\"}"
   response=$(curl_request "$AEZA_API_ENDPOINT/auth" "POST" "$data" "$USER_AGENT")
 
-  response_code=$(jq -r '.code' <<<"$response")
-  response_exception=$(jq -r '.response.exception // empty' <<<"$response")
+  response_code=$(process_json "$response" '.code')
+  response_exception=$(process_json "$response" '.response.exception // empty')
 
   case "$response_code" in
     "OK")
@@ -111,7 +120,8 @@ get_confirmation_code() {
 
   messages=$(curl_request "$EMAIL_API_ENDPOINT/$email/messages" "GET")
 
-  code=$(echo "$messages" | jq -r '.[] | select(.subject == "Ваш код подтверждения Aéza Security") | .body_text' | grep -oE -m1 '[0-9]{6}')
+  code=$(process_json "$messages" '.[] | select(.subject == "Ваш код подтверждения Aéza Security") | .body_text' | grep -oE -m1 '[0-9]{6}')
+  # code=$(echo "$messages" | jq -r '.[] | select(.subject == "Ваш код подтверждения Aéza Security") | .body_text' | grep -oE -m1 '[0-9]{6}')
 
   if [[ -n "$code" ]]; then
     echo "$code"
@@ -132,13 +142,18 @@ get_account_token() {
   device_id=$(generate_device_id)
   local data="{\"email\":\"$email\",\"code\":\"$code\"}"
   response=$(curl_request "$AEZA_API_ENDPOINT/auth-confirm" "POST" "$data" "$USER_AGENT" "Device-Id: $device_id")
-  jq -r '.response.token' <<<"$response"
+  process_json "$response" '.response.token'
 }
 
 get_free_locations_list() {
-  response=$(curl_request "https://api.aeza-security.net/v2/locations" "GET" "" "$USER_AGENT")
-  free_locations=($(echo "$response" | jq -r '.response | to_entries | map(select(.value.free == true)) | .[].key'))
-  echo "${free_locations[@]}"
+  response=$(curl_request "$AEZA_API_ENDPOINT/locations" "GET" "" "$USER_AGENT")
+  free_locations=$(process_json "$response" '.response | to_entries | map(select(.value.free == true)) | .[].key')
+
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
+
+  echo "$free_locations"
 }
 
 select_location() {
@@ -151,9 +166,7 @@ select_location() {
   locations_with_extra=("${free_locations[@]}" "random" "exit")
 
   select location in "${locations_with_extra[@]}"; do
-    if [[ "$location" == "Exit" ]]; then
-      return 1
-    elif [[ "$location" == "Random" ]]; then
+    if [[ "$location" == "random" ]]; then
       random_location=${free_locations[$((RANDOM % ${#free_locations[@]}))]}
       echo "$random_location"
       break
@@ -167,8 +180,15 @@ select_location() {
 main() {
   log_message "INFO" "Starting script"
 
-  selected_location=$(select_location)
-  log_message "INFO" "Selected location: $selected_location"
+  log_message "INFO" "Getting free locations"
+  selected_option=$(select_location)
+
+  if [[ "$selected_option" == "exit" || -z "$selected_option" ]]; then
+    log_message "INFO" "Exiting script"
+    exit 0
+  fi
+
+  log_message "INFO" "Selected location: $selected_option"
 
   email=$(get_email)
   log_message "INFO" "Generated email: $email"
