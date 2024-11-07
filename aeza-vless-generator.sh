@@ -3,9 +3,9 @@
 EMAIL_API_ENDPOINT="https://api.internal.temp-mail.io/api/v3/email"
 AEZA_API_ENDPOINT="https://api.aeza-security.net/v2"
 USER_AGENT="okhttp/5.0.0-alpha.14"
-CURL_TIMEOUT=5
+CURL_TIMEOUT=10
 CURL_RETRY=5
-CURL_RETRY_DELAY=2
+CURL_RETRY_DELAY=3
 
 log_message() {
   local log_level="$1"
@@ -38,16 +38,24 @@ curl_request() {
   local method="$2"
   local data="${3:-}"
   local user_agent="${4:-}"
+  shift 4
+
+  headers=("-H" "Content-Type: application/json")
+  while (($# > 0)); do
+    headers+=("-H" "$1")
+    shift
+  done
 
   response=$(curl -s --connect-timeout "$CURL_TIMEOUT" \
-    --max-time "$CURL_TIMEOUT" \
     --retry "$CURL_RETRY" \
     --retry-delay "$CURL_RETRY_DELAY" \
     --retry-max-time "$CURL_TIMEOUT" \
     -X "$method" "$url" \
     ${user_agent:+-A "$user_agent"} \
-    -H "Content-Type: application/json" \
+    "${headers[@]}" \
     ${data:+-d "$data"})
+  # --proxy 127.0.0.1:8080 \
+  # --insecure \
 
   if [[ $? -ne 0 ]]; then
     log_message "ERROR" "Failed to execute curl request to $url after $CURL_RETRY retries"
@@ -135,11 +143,10 @@ generate_device_id() {
   openssl rand -hex 8
 }
 
-get_account_token() {
+get_api_token() {
   local email="$1"
   local code="$2"
-  local device_id
-  device_id=$(generate_device_id)
+  device_id="$3"
   local data="{\"email\":\"$email\",\"code\":\"$code\"}"
   response=$(curl_request "$AEZA_API_ENDPOINT/auth-confirm" "POST" "$data" "$USER_AGENT" "Device-Id: $device_id")
   process_json "$response" '.response.token'
@@ -177,6 +184,14 @@ select_location() {
   done
 }
 
+obtain_vless_key() {
+  local location="$1"
+  local data="{\"location\":\"$location\"}"
+  local device_id="$2"
+  response=$(curl_request "$AEZA_API_ENDPOINT/vpn/connect" "POST" "$data" "$USER_AGENT" "Device-Id: $device_id" "Aeza-Token: $api_token")
+  process_json "$response" '.response.accessKey'
+}
+
 main() {
   log_message "INFO" "Starting script"
 
@@ -208,10 +223,17 @@ main() {
     exit 1
   fi
 
-  token=$(get_account_token "$email" "$confirmation_code")
-  log_message "INFO" "Account token obtained successfully: $token"
+  device_id=$(generate_device_id)
+  api_token=$(get_api_token "$email" "$confirmation_code" "$device_id")
+  log_message "INFO" "API token successfully obtained: $api_token"
 
-  log_message "INFO" "Script finished successfully"
+  vless_key=$(obtain_vless_key "$selected_option" "$device_id")
+  log_message "INFO" "VLESS key successfully obtained"
+  
+  qrencode -t ANSI256UTF8 "$vless_key"
+  printf "\nHere is your VLESS key:\n\n%s\n" "$vless_key"
+
+  # log_message "INFO" "Script finished successfully"
 }
 
 main
