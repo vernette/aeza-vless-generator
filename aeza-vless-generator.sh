@@ -85,7 +85,7 @@ wait_for_message() {
     ((attempt++))
     log_message "INFO" "Attempt $attempt: Checking for messages..."
 
-    messages=$(curl_request "$EMAIL_API_ENDPOINT/$email/messages" "GET" "" "")
+    messages=$(curl_request "$EMAIL_API_ENDPOINT/$email/messages" "GET")
 
     if [[ "$messages" != "[]" ]]; then
       log_message "INFO" "Message detected"
