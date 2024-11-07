@@ -20,14 +20,22 @@ curl_request() {
   local method="$2"
   local data="${3:-}"
   local user_agent="${4:-}"
+  shift 4
+
+  headers=("-H" "Content-Type: application/json")
+  while (($# > 0)); do
+    headers+=("-H" "$1")
+    shift
+  done
 
   response=$(curl -s --connect-timeout "$CURL_TIMEOUT" \
     --max-time "$CURL_TIMEOUT" \
     --retry "$CURL_RETRY" \
     --retry-delay "$CURL_RETRY_DELAY" \
+    --retry-max-time "$CURL_TIMEOUT" \
     -X "$method" "$url" \
     ${user_agent:+-A "$user_agent"} \
-    -H "Content-Type: application/json" \
+    "${headers[@]}" \
     ${data:+-d "$data"})
 
   return_code=$?
@@ -113,6 +121,20 @@ get_confirmation_code() {
   fi
 }
 
+generate_device_id() {
+  openssl rand -hex 8
+}
+
+get_account_token() {
+  local email="$1"
+  local code="$2"
+  local device_id
+  device_id=$(generate_device_id)
+  local data="{\"email\":\"$email\",\"code\":\"$code\"}"
+  response=$(curl_request "$AEZA_API_ENDPOINT/auth-confirm" "POST" "$data" "$USER_AGENT" "Device-Id: $device_id")
+  jq -r '.response.token' <<<"$response"
+}
+
 main() {
   log_message "INFO" "Starting script"
   email=$(get_email)
@@ -133,6 +155,7 @@ main() {
     exit 1
   fi
 
+  token=$(get_account_token "$email" "$confirmation_code")
   log_message "INFO" "Script finished successfully"
 }
 
