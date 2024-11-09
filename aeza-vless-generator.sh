@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+DEPENDENCIES="curl openssl jq qrencode"
 EMAIL_API_ENDPOINT="https://api.internal.temp-mail.io/api/v3/email"
 AEZA_API_ENDPOINT="https://api.aeza-security.net/v2"
 USER_AGENT="okhttp/5.0.0-alpha.14"
@@ -11,6 +12,62 @@ log_message() {
   local timestamp
   timestamp=$(date +"%d.%m.%Y %H:%M:%S")
   echo "[$timestamp] [$log_level]: $message" | tee -a "$LOG_FILE"
+}
+
+is_installed() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+install_dependencies() {
+  local missing_packages=()
+
+  for pkg in $DEPENDENCIES; do
+    if ! is_installed "$pkg"; then
+      missing_packages+=("$pkg")
+    fi
+  done
+
+  if [ ${#missing_packages[@]} -eq 0 ]; then
+    return 0
+  fi
+
+  log_message "INFO" "Missing dependencies: ${missing_packages[*]}. Do you want to install them?"
+  select option in "Yes" "No"; do
+    case "$option" in
+      "Yes")
+        log_message "INFO" "Installing missing dependencies"
+        break
+        ;;
+      "No")
+        log_message "INFO" "Exiting script"
+        exit 0
+        ;;
+    esac
+  done
+
+  if [ -f /etc/os-release ]; then
+    . /etc/os-release
+
+    case "$ID" in
+      debian | ubuntu)
+        sudo apt update
+        sudo apt install -y "${missing_packages[@]}"
+        ;;
+      arch)
+        sudo pacman -Syu --noconfirm "${missing_packages[@]}"
+        ;;
+      fedora)
+        sudo dnf install -y "${missing_packages[@]}"
+        ;;
+      *)
+        log_message "ERROR" "Unknown or unsupported distribution: $ID"
+        exit 1
+        ;;
+    esac
+  else
+    log_message "ERROR" "File /etc/os-release not found, unable to determine distribution"
+    exit 1
+  fi
 }
 
 process_json() {
@@ -203,6 +260,7 @@ print_vless_key() {
 
 main() {
   log_message "INFO" "Script started"
+  install_dependencies
   select_option
   get_email
   send_confirmation_code
