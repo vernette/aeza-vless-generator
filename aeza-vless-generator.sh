@@ -149,15 +149,16 @@ select_option() {
   get_free_locations_list
   local options=("${free_locations[@]}" "random" "exit")
   select option in "${options[@]}"; do
-    if [[ "$option" == "random" ]]; then
-      option=${free_locations[$((RANDOM % ${#free_locations[@]}))]}
-      break
-    elif [[ "$option" == "exit" ]]; then
-      log_message "INFO" "Exiting script"
-      exit 0
-    elif [[ -n "$option" ]]; then
-      break
-    fi
+    case "$option" in
+      "random")
+        option=${free_locations[$((RANDOM % ${#free_locations[@]}))]}
+        break
+        ;;
+      "exit")
+        log_message "INFO" "Exiting script"
+        exit 0
+        ;;
+    esac
   done
 }
 
