@@ -202,7 +202,7 @@ print_vless_key() {
 }
 
 main() {
-  log_message "INFO" "Starting script"
+  log_message "INFO" "Script started"
   select_option
   get_email
   send_confirmation_code
