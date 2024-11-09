@@ -143,7 +143,7 @@ send_confirmation_code() {
 
 wait_for_email_message() {
   local max_attempts=10
-  local attempt_timeout=12
+  local attempt_timeout=10
   local attempt=0
 
   while [[ $attempt -lt $max_attempts ]]; do
@@ -155,6 +155,7 @@ wait_for_email_message() {
     fi
     log_message "INFO" "No messages yet, sleeping for $attempt_timeout seconds"
     sleep "$attempt_timeout"
+    attempt_timeout=$((attempt_timeout * 2))
   done
 
   log_message "ERROR" "Failed to receive a message"
@@ -175,12 +176,14 @@ generate_device_id() {
 
 get_api_token() {
   local response
+  local min_sleep_time=10
+  local max_sleep_time=30
   log_message "INFO" "Getting API token"
   response=$(curl_request "$AEZA_API_ENDPOINT/auth-confirm" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --data "{\"email\": \"$email\", \"code\": \"$code\"}")
   api_token=$(process_json "$response" '.response.token')
   log_message "INFO" "API token: $api_token"
-  log_message "INFO" "Sleeping for a random amount of time (from 10 to 30 secs)"
-  sleep $((RANDOM % 21 + 10))
+  log_message "INFO" "Sleeping for a random amount of time (from $min_sleep_time to $max_sleep_time secs)"
+  sleep $((RANDOM % (max_sleep_time - min_sleep_time + 1) + min_sleep_time))
 }
 
 get_vless_key() {
