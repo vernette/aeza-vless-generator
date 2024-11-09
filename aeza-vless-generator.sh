@@ -3,93 +3,135 @@
 EMAIL_API_ENDPOINT="https://api.internal.temp-mail.io/api/v3/email"
 AEZA_API_ENDPOINT="https://api.aeza-security.net/v2"
 USER_AGENT="okhttp/5.0.0-alpha.14"
-CURL_TIMEOUT=10
-CURL_RETRY=5
-CURL_RETRY_DELAY=3
+LOG_FILE="log.txt"
+CURL_RETRY_ATTEMPTS=10
+CURL_MAX_TIME=10
+CURL_CONNECTION_TIMEOUT=10
+CURL_RETRY_MAX_TIME=120
 
 log_message() {
   local log_level="$1"
   local message="${*:2}"
   local timestamp
-  timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-  echo "[$timestamp] [$log_level] $message" | tee -a log.txt
+  timestamp=$(date +"%d.%m.%Y %H:%M:%S")
+  echo "[$timestamp] [$log_level]: $message" | tee -a "$LOG_FILE"
 }
 
 process_json() {
   local response="$1"
   local filter="$2"
-
-  if [[ -z "$response" ]]; then
-    log_message "ERROR" "Empty response received"
-    return 1
-  fi
-
-  echo "$response" | jq empty &>/dev/null
-  if [[ $? -ne 0 ]]; then
-    log_message "ERROR" "Invalid JSON response: $response"
-    return 1
-  fi
-
-  echo "$response" | jq -r "$filter"
+  jq -r "$filter" <<<"$response"
 }
 
 curl_request() {
   local url="$1"
   local method="$2"
-  local data="${3:-}"
-  local user_agent="${4:-}"
-  shift 4
+  shift 2
+  local user_agent=""
+  local headers=()
+  local data=""
+  local proxy=""
+  local response
 
-  headers=("-H" "Content-Type: application/json")
-  while (($# > 0)); do
-    headers+=("-H" "$1")
-    shift
+  while (("$#")); do
+    case "$1" in
+      --user-agent)
+        user_agent="$2"
+        shift 2
+        ;;
+      --header)
+        headers+=("$2")
+        shift 2
+        ;;
+      --data)
+        data="$2"
+        shift 2
+        ;;
+      --proxy)
+        proxy="$2"
+        shift 2
+        ;;
+    esac
   done
 
-  response=$(curl -s --connect-timeout "$CURL_TIMEOUT" \
-    --retry "$CURL_RETRY" \
-    --retry-delay "$CURL_RETRY_DELAY" \
-    --retry-max-time "$CURL_TIMEOUT" \
-    -X "$method" "$url" \
-    ${user_agent:+-A "$user_agent"} \
-    "${headers[@]}" \
-    ${data:+-d "$data"})
-  # --proxy 127.0.0.1:8080 \
-  # --insecure \
+  local curl_command="curl --connect-timeout $CURL_CONNECTION_TIMEOUT --max-time $CURL_MAX_TIME --retry $CURL_RETRY_ATTEMPTS --retry-max-time $CURL_RETRY_MAX_TIME --retry-connrefused --retry-all-errors -s -X $method"
 
-  if [[ $? -ne 0 ]]; then
-    log_message "ERROR" "Failed to execute curl request to $url after $CURL_RETRY retries"
-    exit 1
+  if [[ -n "$user_agent" ]]; then
+    curl_command+=" -A '$user_agent'"
   fi
 
+  for header in "${headers[@]}"; do
+    curl_command+=" -H '$header'"
+  done
+
+  if [[ -n "$data" ]]; then
+    curl_command+=" --data '$data'"
+    if ! [[ "${headers[*]}" =~ "Content-Type" ]]; then
+      curl_command+=" -H 'Content-Type: application/json'"
+    fi
+  fi
+
+  if [[ -n "$proxy" ]]; then
+    curl_command+=" --proxy $proxy"
+    curl_command+=" --insecure"
+  fi
+
+  curl_command+=" '$url'"
+  response=$(eval "$curl_command")
   echo "$response"
+}
+
+get_free_locations_list() {
+  local response
+  log_message "INFO" "Getting free locations list"
+  response=$(curl_request "$AEZA_API_ENDPOINT/locations" "GET" --user-agent "$USER_AGENT")
+  mapfile -t free_locations < <(process_json "$response" '.response | to_entries | map(select(.value.free == true)) | .[].key')
+}
+
+select_option() {
+  get_free_locations_list
+  local options=("${free_locations[@]}" "random" "exit")
+  select option in "${options[@]}"; do
+    if [[ "$option" == "random" ]]; then
+      option=${free_locations[$((RANDOM % ${#free_locations[@]}))]}
+      break
+    elif [[ "$option" == "exit" ]]; then
+      log_message "INFO" "Exiting script"
+      exit 0
+    elif [[ -n "$option" ]]; then
+      break
+    fi
+  done
 }
 
 get_email() {
   local response
+  log_message "INFO" "Getting email"
   response=$(curl_request "$EMAIL_API_ENDPOINT/new" "POST")
-  process_json "$response" '.email'
+  email=$(process_json "$response" '.email')
+  log_message "INFO" "Email: $email"
 }
 
 send_confirmation_code() {
-  log_message "INFO" "Sending confirmation code request for $1"
-
-  local data="{\"email\":\"$1\"}"
-  response=$(curl_request "$AEZA_API_ENDPOINT/auth" "POST" "$data" "$USER_AGENT")
-
+  local response
+  local response_code
+  local response_exception
+  log_message "INFO" "Sending confirmation code request for $email"
+  response=$(curl_request "$AEZA_API_ENDPOINT/auth" "POST" --user-agent "$USER_AGENT" --data "{\"email\": \"$email\"}")
   response_code=$(process_json "$response" '.code')
   response_exception=$(process_json "$response" '.response.exception // empty')
 
   case "$response_code" in
     "OK")
-      log_message "INFO" "Confirmation code sent to $1"
+      log_message "INFO" "Confirmation code sent to $email"
       ;;
     "BAD_REQUEST")
       if [[ "$response_exception" == "CONFIRMATION_CODE_ALREADY_SENT" ]]; then
-        log_message "ERROR" "Confirmation code has already been sent to $1"
+        log_message "ERROR" "Confirmation code has already been sent to $email"
         exit 1
       else
         log_message "ERROR" "Bad request: $response"
+        exit 1
       fi
       ;;
     *)
@@ -99,141 +141,75 @@ send_confirmation_code() {
   esac
 }
 
-wait_for_message() {
-  local email="$1"
+wait_for_email_message() {
   local max_attempts=10
-  local attempt_timeout=3
+  local attempt_timeout=12
   local attempt=0
 
   while [[ $attempt -lt $max_attempts ]]; do
     ((attempt++))
     log_message "INFO" "Attempt $attempt: Checking for messages..."
-
-    messages=$(curl_request "$EMAIL_API_ENDPOINT/$email/messages" "GET")
-
-    if [[ "$messages" != "[]" ]]; then
-      log_message "INFO" "Message detected"
-      return 0
+    email_response_body=$(curl_request "$EMAIL_API_ENDPOINT/$email/messages" "GET")
+    if [[ "$email_response_body" != "[]" ]]; then
+      return
     fi
-
+    log_message "INFO" "No messages yet, sleeping for $attempt_timeout seconds"
     sleep "$attempt_timeout"
   done
 
-  return 1
+  log_message "ERROR" "Failed to receive a message"
+  exit 1
 }
 
 get_confirmation_code() {
-  local email="$1"
-  local code=""
-
-  messages=$(curl_request "$EMAIL_API_ENDPOINT/$email/messages" "GET")
-
-  code=$(process_json "$messages" '.[] | select(.subject == "Ваш код подтверждения Aéza Security") | .body_text' | grep -oE -m1 '[0-9]{6}')
-  # code=$(echo "$messages" | jq -r '.[] | select(.subject == "Ваш код подтверждения Aéza Security") | .body_text' | grep -oE -m1 '[0-9]{6}')
-
-  if [[ -n "$code" ]]; then
-    echo "$code"
-    return 0
-  else
-    return 1
-  fi
+  log_message "INFO" "Getting confirmation code"
+  code=$(process_json "$email_response_body" '.[] | select(.subject == "Ваш код подтверждения Aéza Security") | .body_text' | grep -oE -m1 '[0-9]{6}')
+  log_message "INFO" "Confirmation code: $code"
 }
 
 generate_device_id() {
-  openssl rand -hex 8
+  log_message "INFO" "Generating device ID"
+  device_id=$(openssl rand -hex 8)
+  log_message "INFO" "Device ID: $device_id"
 }
 
 get_api_token() {
-  local email="$1"
-  local code="$2"
-  device_id="$3"
-  local data="{\"email\":\"$email\",\"code\":\"$code\"}"
-  response=$(curl_request "$AEZA_API_ENDPOINT/auth-confirm" "POST" "$data" "$USER_AGENT" "Device-Id: $device_id")
-  process_json "$response" '.response.token'
+  local response
+  log_message "INFO" "Getting API token"
+  response=$(curl_request "$AEZA_API_ENDPOINT/auth-confirm" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --data "{\"email\": \"$email\", \"code\": \"$code\"}")
+  api_token=$(process_json "$response" '.response.token')
+  log_message "INFO" "API token: $api_token"
+  log_message "INFO" "Sleeping for a random amount of time (from 10 to 30 secs)"
+  sleep $((RANDOM % 21 + 10))
 }
 
-get_free_locations_list() {
-  response=$(curl_request "$AEZA_API_ENDPOINT/locations" "GET" "" "$USER_AGENT")
-  free_locations=$(process_json "$response" '.response | to_entries | map(select(.value.free == true)) | .[].key')
-
-  if [[ $? -ne 0 ]]; then
-    return 1
-  fi
-
-  echo "$free_locations"
+get_vless_key() {
+  local response
+  log_message "INFO" "Getting VLESS key"
+  response=$(curl_request "$AEZA_API_ENDPOINT/vpn/connect" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --header "Aeza-Token: $api_token" --data "{\"location\": \"$option\"}")
+  vless_key=$(process_json "$response" '.response.accessKey')
+  log_message "INFO" "Got VLESS key"
 }
 
-select_location() {
-  free_locations=($(get_free_locations_list))
-
-  if [[ ${#free_locations[@]} -eq 0 ]]; then
-    return 1
-  fi
-
-  locations_with_extra=("${free_locations[@]}" "random" "exit")
-
-  select location in "${locations_with_extra[@]}"; do
-    if [[ "$location" == "random" ]]; then
-      random_location=${free_locations[$((RANDOM % ${#free_locations[@]}))]}
-      echo "$random_location"
-      break
-    elif [[ -n "$location" ]]; then
-      echo "$location"
-      break
-    fi
-  done
-}
-
-obtain_vless_key() {
-  local location="$1"
-  local data="{\"location\":\"$location\"}"
-  local device_id="$2"
-  response=$(curl_request "$AEZA_API_ENDPOINT/vpn/connect" "POST" "$data" "$USER_AGENT" "Device-Id: $device_id" "Aeza-Token: $api_token")
-  process_json "$response" '.response.accessKey'
+print_vless_key() {
+  echo ""
+  qrencode -t ANSIUTF8 "$vless_key"
+  echo ""
+  log_message "INFO" "VLESS key: $vless_key"
 }
 
 main() {
   log_message "INFO" "Starting script"
-
-  log_message "INFO" "Getting free locations"
-  selected_option=$(select_location)
-
-  if [[ "$selected_option" == "exit" || -z "$selected_option" ]]; then
-    log_message "INFO" "Exiting script"
-    exit 0
-  fi
-
-  log_message "INFO" "Selected location: $selected_option"
-
-  email=$(get_email)
-  log_message "INFO" "Generated email: $email"
-
-  send_confirmation_code "$email"
-
-  if wait_for_message "$email"; then
-    confirmation_code=$(get_confirmation_code "$email")
-    if [[ -n "$confirmation_code" ]]; then
-      log_message "INFO" "Confirmation code obtained successfully: $confirmation_code"
-    else
-      log_message "ERROR" "Failed to obtain confirmation code"
-      exit 1
-    fi
-  else
-    log_message "ERROR" "Failed to receive a message"
-    exit 1
-  fi
-
-  device_id=$(generate_device_id)
-  api_token=$(get_api_token "$email" "$confirmation_code" "$device_id")
-  log_message "INFO" "API token successfully obtained: $api_token"
-
-  vless_key=$(obtain_vless_key "$selected_option" "$device_id")
-  log_message "INFO" "VLESS key successfully obtained"
-  
-  qrencode -t ANSI256UTF8 "$vless_key"
-  printf "\nHere is your VLESS key:\n\n%s\n" "$vless_key"
-
-  # log_message "INFO" "Script finished successfully"
+  select_option
+  get_email
+  send_confirmation_code
+  wait_for_email_message
+  get_confirmation_code
+  generate_device_id
+  get_api_token
+  get_vless_key
+  print_vless_key
+  log_message "INFO" "Script finished"
 }
 
 main
