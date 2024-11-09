@@ -158,6 +158,10 @@ select_option() {
         log_message "INFO" "Exiting script"
         exit 0
         ;;
+      *)
+        log_message "INFO" "Selected option: $option"
+        break
+        ;;
     esac
   done
 }
