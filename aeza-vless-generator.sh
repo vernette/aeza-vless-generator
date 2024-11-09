@@ -4,10 +4,6 @@ EMAIL_API_ENDPOINT="https://api.internal.temp-mail.io/api/v3/email"
 AEZA_API_ENDPOINT="https://api.aeza-security.net/v2"
 USER_AGENT="okhttp/5.0.0-alpha.14"
 LOG_FILE="log.txt"
-CURL_RETRY_ATTEMPTS=10
-CURL_MAX_TIME=10
-CURL_CONNECTION_TIMEOUT=10
-CURL_RETRY_MAX_TIME=120
 
 log_message() {
   local log_level="$1"
@@ -32,6 +28,10 @@ curl_request() {
   local data=""
   local proxy=""
   local response
+  local retry_attempts=10
+  local max_time=10
+  local connection_timeout=10
+  local retry_max_time=120
 
   while (("$#")); do
     case "$1" in
@@ -54,7 +54,7 @@ curl_request() {
     esac
   done
 
-  local curl_command="curl --connect-timeout $CURL_CONNECTION_TIMEOUT --max-time $CURL_MAX_TIME --retry $CURL_RETRY_ATTEMPTS --retry-max-time $CURL_RETRY_MAX_TIME --retry-connrefused --retry-all-errors -s -X $method"
+  local curl_command="curl --connect-timeout $connection_timeout --max-time $max_time --retry $retry_attempts --retry-max-time $retry_max_time --retry-connrefused --retry-all-errors -s -X $method"
 
   if [[ -n "$user_agent" ]]; then
     curl_command+=" -A '$user_agent'"
