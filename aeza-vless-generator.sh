@@ -271,19 +271,24 @@ print_vless_key() {
 }
 
 save_account_data() {
+  local timestamp
+  timestamp=$(date +%s)
+  local filename="${timestamp}_${email}.json"
   mkdir -p "$OUTPUT_DATA_FOLDER"
   jq -n \
     --arg email "$email" \
-    --arg aeza_token "$api_token" \
+    --arg api_token "$api_token" \
     --arg device_id "$device_id" \
     --arg vless_key "$vless_key" \
+    --arg location "$option" \
     '{
       email: $email,
-      aeza_token: $aeza_token,
+      api_token: $api_token,
       device_id: $device_id,
-      vless_key: $vless_key
+      vless_key: $vless_key,
+      location: $location
     }' \
-    >>"$OUTPUT_DATA_FOLDER/$email.json"
+    >>"$OUTPUT_DATA_FOLDER/$filename"
 }
 
 main() {
@@ -300,6 +305,7 @@ main() {
   get_vless_key
   clear_screen
   print_vless_key
+  save_account_data
   log_message "INFO" "Script finished"
 }
 
