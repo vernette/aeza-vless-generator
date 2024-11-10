@@ -58,7 +58,7 @@ install_dependencies() {
         NEEDRESTART_MODE=a sudo apt install -y "${missing_packages[@]}"
         ;;
       arch)
-        sudo pacman -Syu --noconfirm "${missing_packages[@]}"
+        sudo pacman -Syy --noconfirm "${missing_packages[@]}"
         ;;
       fedora)
         sudo dnf install -y "${missing_packages[@]}"
