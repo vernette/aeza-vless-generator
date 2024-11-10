@@ -47,7 +47,7 @@ install_dependencies() {
         exit 0
         ;;
     esac
-  done
+  done </dev/tty
 
   if [ -f /etc/os-release ]; then
     . /etc/os-release
@@ -167,7 +167,7 @@ select_option() {
         break
         ;;
     esac
-  done
+  done </dev/tty
 }
 
 get_email() {
