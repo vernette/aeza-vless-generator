@@ -51,7 +51,7 @@ install_dependencies() {
     case "$ID" in
       debian | ubuntu)
         sudo apt update
-        sudo apt install -y "${missing_packages[@]}"
+        NEEDRESTART_MODE=a sudo apt install -y "${missing_packages[@]}"
         ;;
       arch)
         sudo pacman -Syu --noconfirm "${missing_packages[@]}"
