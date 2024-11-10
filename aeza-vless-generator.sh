@@ -5,6 +5,7 @@ EMAIL_API_ENDPOINT="https://api.internal.temp-mail.io/api/v3/email"
 AEZA_API_ENDPOINT="https://api.aeza-security.net/v2"
 USER_AGENT="okhttp/5.0.0-alpha.14"
 LOG_FILE="log.txt"
+OUTPUT_DATA_FOLDER="output"
 
 clear_screen() {
   clear
@@ -267,6 +268,22 @@ print_vless_key() {
   qrencode -t ANSIUTF8 "$vless_key"
   echo ""
   log_message "INFO" "VLESS key: $vless_key"
+}
+
+save_account_data() {
+  mkdir -p "$OUTPUT_DATA_FOLDER"
+  jq -n \
+    --arg email "$email" \
+    --arg aeza_token "$api_token" \
+    --arg device_id "$device_id" \
+    --arg vless_key "$vless_key" \
+    '{
+      email: $email,
+      aeza_token: $aeza_token,
+      device_id: $device_id,
+      vless_key: $vless_key
+    }' \
+    >>"$OUTPUT_DATA_FOLDER/$email.json"
 }
 
 main() {
