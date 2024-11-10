@@ -157,6 +157,7 @@ select_option() {
     case "$option" in
       "random")
         option=${free_locations[$((RANDOM % ${#free_locations[@]}))]}
+        log_message "INFO" "Selected option: $option"
         break
         ;;
       "exit")
