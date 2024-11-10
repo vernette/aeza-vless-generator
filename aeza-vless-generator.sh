@@ -151,6 +151,7 @@ get_free_locations_list() {
 
 select_option() {
   get_free_locations_list
+  log_message "INFO" "Select an option. Available options: ${free_locations[*]} or choose 'random' to let the script choose for you"
   local options=("${free_locations[@]}" "random" "exit")
   select option in "${options[@]}"; do
     case "$option" in
