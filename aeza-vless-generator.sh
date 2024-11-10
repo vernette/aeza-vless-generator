@@ -6,6 +6,10 @@ AEZA_API_ENDPOINT="https://api.aeza-security.net/v2"
 USER_AGENT="okhttp/5.0.0-alpha.14"
 LOG_FILE="log.txt"
 
+clear_screen() {
+  clear
+}
+
 log_message() {
   local log_level="$1"
   local message="${*:2}"
@@ -266,6 +270,7 @@ print_vless_key() {
 main() {
   log_message "INFO" "Script started"
   install_dependencies
+  clear_screen
   select_option
   get_email
   send_confirmation_code
@@ -274,6 +279,7 @@ main() {
   generate_device_id
   get_api_token
   get_vless_key
+  clear_screen
   print_vless_key
   log_message "INFO" "Script finished"
 }
