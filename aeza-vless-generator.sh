@@ -92,7 +92,8 @@ curl_request() {
   shift 2
   local user_agent=""
   local headers=()
-  local data=""
+  local json=""
+  local file=""
   local proxy=""
   local response
   local retry_attempts=10
@@ -110,8 +111,12 @@ curl_request() {
         headers+=("$2")
         shift 2
         ;;
-      --data)
-        data="$2"
+      --json)
+        json="$2"
+        shift 2
+        ;;
+      --file)
+        file="$2"
         shift 2
         ;;
       --proxy)
@@ -131,11 +136,15 @@ curl_request() {
     curl_command+=" -H '$header'"
   done
 
-  if [[ -n "$data" ]]; then
-    curl_command+=" --data '$data'"
+  if [[ -n "$json" ]]; then
+    curl_command+=" --data '$json'"
     if ! [[ "${headers[*]}" =~ "Content-Type" ]]; then
       curl_command+=" -H 'Content-Type: application/json'"
     fi
+  fi
+
+  if [[ -n "$file" ]]; then
+    curl_command+=" --upload-file '$file'"
   fi
 
   if [[ -n "$proxy" ]]; then
@@ -191,7 +200,7 @@ send_confirmation_code() {
   local response_code
   local response_exception
   log_message "INFO" "Sending confirmation code request for $email"
-  response=$(curl_request "$AEZA_API_ENDPOINT/auth" "POST" --user-agent "$USER_AGENT" --data "{\"email\": \"$email\"}")
+  response=$(curl_request "$AEZA_API_ENDPOINT/auth" "POST" --user-agent "$USER_AGENT" --json "{\"email\": \"$email\"}")
   response_code=$(process_json "$response" '.code')
   response_exception=$(process_json "$response" '.response.exception // empty')
 
@@ -253,7 +262,7 @@ get_api_token() {
   local min_sleep_time=10
   local max_sleep_time=30
   log_message "INFO" "Getting API token"
-  response=$(curl_request "$AEZA_API_ENDPOINT/auth-confirm" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --data "{\"email\": \"$email\", \"code\": \"$code\"}")
+  response=$(curl_request "$AEZA_API_ENDPOINT/auth-confirm" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --json "{\"email\": \"$email\", \"code\": \"$code\"}")
   api_token=$(process_json "$response" '.response.token')
   log_message "INFO" "API token: $api_token"
   log_message "INFO" "Sleeping for a random amount of time (from $min_sleep_time to $max_sleep_time secs), please wait..."
@@ -263,22 +272,15 @@ get_api_token() {
 get_vless_key() {
   local response
   log_message "INFO" "Getting VLESS key"
-  response=$(curl_request "$AEZA_API_ENDPOINT/vpn/connect" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --header "Aeza-Token: $api_token" --data "{\"location\": \"$option\"}")
+  response=$(curl_request "$AEZA_API_ENDPOINT/vpn/connect" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --header "Aeza-Token: $api_token" --json "{\"location\": \"$option\"}")
   vless_key=$(process_json "$response" '.response.accessKey')
   log_message "INFO" "Got VLESS key"
-}
-
-print_vless_key() {
-  echo ""
-  qrencode -t ANSIUTF8 "$vless_key"
-  echo ""
-  log_message "INFO" "VLESS key: $vless_key"
 }
 
 save_account_data() {
   local timestamp
   timestamp=$(date +%s)
-  local filename="${timestamp}_${email}.json"
+  filename="${timestamp}_${email}.json"
   mkdir -p "$OUTPUT_DATA_FOLDER"
   jq -n \
     --arg email "$email" \
@@ -296,6 +298,22 @@ save_account_data() {
     >>"$OUTPUT_DATA_FOLDER/$filename"
 }
 
+upload_account_data() {
+  local download_url
+  log_message "INFO" "Uploading a file with account data to bashupload"
+  download_url=$(curl_request "https://bashupload.com" "POST" --file "$OUTPUT_DATA_FOLDER/$filename" | grep -oP 'https://bashupload\.com/\S+')
+  direct_download_url="$download_url?download=1"
+  log_message "INFO" "Successfully uploaded the account data file to bashupload"
+}
+
+print_vless_key() {
+  qrencode -t ANSIUTF8 "$vless_key"
+  echo ""
+  log_message "INFO" "VLESS key: $vless_key"
+  echo ""
+  log_message "INFO" "One-time download link: $direct_download_url"
+}
+
 main() {
   log_message "INFO" "Script started"
   install_dependencies
@@ -308,10 +326,10 @@ main() {
   generate_device_id
   get_api_token
   get_vless_key
+  save_account_data
+  upload_account_data
   clear_screen
   print_vless_key
-  save_account_data
-  # TODO: Add function to upload account data to bashupload
   log_message "INFO" "Script finished"
 }
 
