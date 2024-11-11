@@ -24,7 +24,12 @@ is_installed() {
 }
 
 install_dependencies() {
+  local use_sudo=""
   local missing_packages=()
+
+  if [ "$(id -u)" -ne 0 ]; then
+    use_sudo="sudo"
+  fi
 
   for pkg in $DEPENDENCIES; do
     if ! is_installed "$pkg"; then
@@ -55,14 +60,14 @@ install_dependencies() {
 
     case "$ID" in
       debian | ubuntu)
-        sudo apt update
-        NEEDRESTART_MODE=a sudo apt install -y "${missing_packages[@]}"
+        $use_sudo apt update
+        NEEDRESTART_MODE=a $use_sudo apt install -y "${missing_packages[@]}"
         ;;
       arch)
-        sudo pacman -Syy --noconfirm "${missing_packages[@]}"
+        $use_sudo pacman -Syy --noconfirm "${missing_packages[@]}"
         ;;
       fedora)
-        sudo dnf install -y "${missing_packages[@]}"
+        $use_sudo dnf install -y "${missing_packages[@]}"
         ;;
       *)
         log_message "ERROR" "Unknown or unsupported distribution: $ID"
@@ -306,6 +311,8 @@ main() {
   clear_screen
   print_vless_key
   save_account_data
+  # TODO: Add function to upload account data to bashupload
+  # TODO: Add Dockerfile
   log_message "INFO" "Script finished"
 }
 
