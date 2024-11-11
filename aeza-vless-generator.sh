@@ -312,7 +312,6 @@ main() {
   print_vless_key
   save_account_data
   # TODO: Add function to upload account data to bashupload
-  # TODO: Add Dockerfile
   log_message "INFO" "Script finished"
 }
 

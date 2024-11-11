@@ -44,16 +44,18 @@ curl -s https://raw.githubusercontent.com/vernette/aeza-vless-generator/master/a
 wget -qO- https://raw.githubusercontent.com/vernette/aeza-vless-generator/master/aeza-vless-generator.sh | bash
 ```
 
-#### Ручной запуск
+#### Docker
 
 ```bash
 git clone https://github.com/vernette/aeza-vless-generator.git
 cd aeza-vless-generator
-chmod +x aeza-vless-generator.sh
-./aeza-vless-generator.sh
+docker build -t aeza-vless-generator .
+docker run --rm -it aeza-vless-generator
 ```
 
 ## TODO
 
 - [ ] Менеджер аккаунтов
+- [ ] Загрузка файла с данными от аккаунта на bashupload.com
+- [x] Dockerfile
 - [x] Сохранение результатов в файл
