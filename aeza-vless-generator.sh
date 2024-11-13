@@ -105,6 +105,9 @@ curl_request() {
   local max_time=10
   local connection_timeout=10
   local retry_max_time=120
+  local status_code=0
+  local attempt=0
+  local attempt_timeout=2
 
   while (("$#")); do
     case "$1" in
@@ -131,7 +134,7 @@ curl_request() {
     esac
   done
 
-  local curl_command="curl --connect-timeout $connection_timeout --max-time $max_time --retry $retry_attempts --retry-max-time $retry_max_time --retry-connrefused --retry-all-errors -s -X $method"
+  local curl_command="curl --connect-timeout $connection_timeout --max-time $max_time --retry $retry_attempts --retry-max-time $retry_max_time --retry-connrefused --retry-all-errors -s -w '%{http_code}' -X $method"
 
   if [[ -n "$user_agent" ]]; then
     curl_command+=" -A '$user_agent'"
@@ -158,8 +161,26 @@ curl_request() {
   fi
 
   curl_command+=" '$url'"
-  response=$(eval "$curl_command")
-  echo "$response"
+
+  # TODO: Probably should be refactored, but it works for now
+  while [[ $attempt -lt $retry_attempts ]]; do
+    attempt=$((attempt + 1))
+    response=$(eval "$curl_command")
+    status_code="${response: -3}"
+    body="${response:0:${#response}-3}"
+
+    if [[ $status_code -ne 200 ]]; then
+      log_message "WARNING" "Attempt $attempt received status code $status_code. Retrying..."
+      sleep $((attempt_timeout * 2))
+      continue
+    fi
+
+    echo "$body"
+    return 0
+  done
+
+  log_message "ERROR" "Failed to receive status 200 after $retry_attempts attempts. Last response body: $body"
+  exit 1
 }
 
 get_free_locations_list() {
