@@ -198,7 +198,6 @@ select_option() {
     case "$option" in
       "random")
         option=${free_locations[$((RANDOM % ${#free_locations[@]}))]}
-        log_message "INFO" "Selected option: $option"
         break
         ;;
       "exit")
@@ -206,11 +205,11 @@ select_option() {
         exit 0
         ;;
       *)
-        log_message "INFO" "Selected option: $option"
         break
         ;;
     esac
   done </dev/tty
+  log_message "INFO" "Selected option: $option"
 }
 
 get_email() {
@@ -242,10 +241,6 @@ send_confirmation_code() {
         log_message "ERROR" "Bad request: $response"
         exit 1
       fi
-      ;;
-    *)
-      log_message "ERROR" "Unknown error: $response"
-      exit 1
       ;;
   esac
 }
