@@ -285,14 +285,10 @@ generate_device_id() {
 
 get_api_token() {
   local response
-  local min_sleep_time=10
-  local max_sleep_time=30
   log_message "INFO" "Getting API token"
   response=$(curl_request "$AEZA_API_ENDPOINT/auth-confirm" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --json "{\"email\": \"$email\", \"code\": \"$code\"}")
   api_token=$(process_json "$response" '.response.token')
   log_message "INFO" "API token: $api_token"
-  log_message "INFO" "Sleeping for a random amount of time (from $min_sleep_time to $max_sleep_time secs), please wait..."
-  sleep $((RANDOM % (max_sleep_time - min_sleep_time + 1) + min_sleep_time))
 }
 
 decode_url() {
