@@ -11,11 +11,16 @@ clear_screen() {
   clear
 }
 
+get_timestamp() {
+  local format="$1"
+  date +"$format"
+}
+
 log_message() {
   local log_level="$1"
   local message="${*:2}"
   local timestamp
-  timestamp=$(date +"%d.%m.%Y %H:%M:%S")
+  timestamp=$(get_timestamp "%d.%m.%Y %H:%M:%S")
   echo "[$timestamp] [$log_level]: $message" | tee -a "$LOG_FILE"
 }
 
@@ -269,17 +274,24 @@ get_api_token() {
   sleep $((RANDOM % (max_sleep_time - min_sleep_time + 1) + min_sleep_time))
 }
 
+decode_url() {
+  local url_encoded="${1//+/ }"
+  printf '%b' "${url_encoded//%/\\x}"
+}
+
 get_vless_key() {
   local response
+  local vless_key_raw
   log_message "INFO" "Getting VLESS key"
   response=$(curl_request "$AEZA_API_ENDPOINT/vpn/connect" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --header "Aeza-Token: $api_token" --json "{\"location\": \"$option\"}")
-  vless_key=$(process_json "$response" '.response.accessKey')
+  vless_key_raw=$(process_json "$response" '.response.accessKey')
+  vless_key=$(decode_url "$vless_key_raw")
   log_message "INFO" "Got VLESS key"
 }
 
 save_account_data() {
   local timestamp
-  timestamp=$(date +%s)
+  timestamp=$(get_timestamp "+%s")
   filename="${timestamp}_${email}.json"
   mkdir -p "$OUTPUT_DATA_FOLDER"
   jq -n \
