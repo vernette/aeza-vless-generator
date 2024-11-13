@@ -308,7 +308,7 @@ get_vless_key() {
 
 save_account_data() {
   local timestamp
-  timestamp=$(get_timestamp "+%s")
+  timestamp=$(get_timestamp "%s")
   filename="${timestamp}_${email}.json"
   mkdir -p "$OUTPUT_DATA_FOLDER"
   jq -n \
