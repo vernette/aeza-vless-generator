@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 DEPENDENCIES="curl openssl jq qrencode"
-EMAIL_API_ENDPOINT="https://api.internal.temp-mail.io/api/v3/email"
+KOPEECHKA_API_ENDPOINT="https://api.kopeechka.store"
 AEZA_API_ENDPOINT="https://api.aeza-security.net/v2"
 USER_AGENT="okhttp/5.0.0-alpha.14"
 LOG_FILE="log.txt"
@@ -212,14 +212,6 @@ select_option() {
   log_message "INFO" "Selected option: $option"
 }
 
-get_email() {
-  local response
-  log_message "INFO" "Getting email"
-  response=$(curl_request "$EMAIL_API_ENDPOINT/new" "POST")
-  email=$(process_json "$response" '.email')
-  log_message "INFO" "Email: $email"
-}
-
 send_confirmation_code() {
   local response
   local response_code
@@ -253,7 +245,7 @@ wait_for_email_message() {
   while [[ $attempt -lt $max_attempts ]]; do
     ((attempt++))
     log_message "INFO" "Attempt $attempt: Checking for messages..."
-    email_response_body=$(curl_request "$EMAIL_API_ENDPOINT/$email/messages" "GET")
+    email_response_body=$(curl_request "$KOPEECHKA_API_ENDPOINT/$email/messages" "GET")
     if [[ "$email_response_body" != "[]" ]]; then
       return
     fi
@@ -380,7 +372,6 @@ main() {
   install_dependencies
   clear_screen
   select_option
-  get_email
   send_confirmation_code
   wait_for_email_message
   get_confirmation_code
