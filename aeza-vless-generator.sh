@@ -187,7 +187,7 @@ get_free_locations_list() {
   local response
   log_message "INFO" "Getting free locations list"
   response=$(curl_request "$AEZA_API_ENDPOINT/locations" "GET" --user-agent "$USER_AGENT")
-  mapfile -t free_locations < <(process_json "$response" '.response | to_entries | map(select(.value.free == true)) | .[].key')
+  mapfile -t free_locations < <(process_json "$response" '.response | to_entries | map(select(.value.free == true)) | .[].key | ascii_upcase')
 }
 
 select_option() {
