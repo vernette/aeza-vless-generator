@@ -286,6 +286,21 @@ get_api_token() {
   log_message "INFO" "API token: $api_token"
 }
 
+check_available_traffic() {
+  local response
+  local available_traffic
+  log_message "INFO" "Checking available traffic"
+  response=$(curl_request "$AEZA_API_ENDPOINT/subscription/get" "GET" --user-agent "$USER_AGENT" --header "Aeza-Token: $api_token")
+  available_traffic=$(process_json "$response" '.response.trafficLeft')
+
+  if [[ "$available_traffic" -eq 0 ]]; then
+    log_message "ERROR" "No available traffic for $email"
+    exit 1
+  fi
+
+  log_message "INFO" "Available traffic: $available_traffic"
+}
+
 decode_url() {
   local url_encoded="${1//+/ }"
   printf '%b' "${url_encoded//%/\\x}"
@@ -349,6 +364,7 @@ main() {
   get_confirmation_code
   generate_device_id
   get_api_token
+  check_available_traffic
   get_vless_key
   save_account_data
   upload_account_data
