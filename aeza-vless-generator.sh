@@ -339,7 +339,6 @@ save_account_data() {
 
 upload_account_data() {
   local download_url
-  local upload_file
 
   log_message "INFO" "Would you like to upload a file with account data to bashupload? Useful when using remote servers."
   select option in "Yes" "No"; do
@@ -368,7 +367,10 @@ print_vless_key() {
   echo ""
   log_message "INFO" "VLESS key: $vless_key"
   echo ""
-  log_message "INFO" "One-time download link: $direct_download_url"
+
+  if [[ "$upload_file" == true ]]; then
+    log_message "INFO" "One-time download link: $direct_download_url"
+  fi
 }
 
 main() {
