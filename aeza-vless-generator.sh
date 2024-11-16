@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 DEPENDENCIES="curl openssl jq qrencode"
-KOPEECHKA_API_ENDPOINT="https://api.kopeechka.store"
 AEZA_API_ENDPOINT="https://api.aeza-security.net/v2"
 USER_AGENT="okhttp/5.0.0-alpha.14"
 LOG_FILE="log.txt"
@@ -79,6 +78,8 @@ install_dependencies() {
         exit 1
         ;;
     esac
+
+    clear_screen
   else
     log_message "ERROR" "File /etc/os-release not found, unable to determine distribution"
     exit 1
@@ -212,6 +213,11 @@ select_location() {
   log_message "INFO" "Selected option: $option"
 }
 
+get_email_from_user() {
+  read -r -p "Enter your email (A confirmation code will be sent to it. Please do not use temporary mail services): " email
+  log_message "INFO" "Email: $email"
+}
+
 send_confirmation_code() {
   local response
   local response_code
@@ -237,30 +243,8 @@ send_confirmation_code() {
   esac
 }
 
-wait_for_email_message() {
-  local max_attempts=10
-  local attempt_timeout=10
-  local attempt=0
-
-  while [[ $attempt -lt $max_attempts ]]; do
-    ((attempt++))
-    log_message "INFO" "Attempt $attempt: Checking for messages..."
-    email_response_body=$(curl_request "$KOPEECHKA_API_ENDPOINT/$email/messages" "GET")
-    if [[ "$email_response_body" != "[]" ]]; then
-      return
-    fi
-    log_message "INFO" "No messages yet, sleeping for $attempt_timeout seconds"
-    sleep "$attempt_timeout"
-    attempt_timeout=$((attempt_timeout * 2))
-  done
-
-  log_message "ERROR" "Failed to receive a message"
-  exit 1
-}
-
-get_confirmation_code() {
-  log_message "INFO" "Getting confirmation code"
-  code=$(process_json "$email_response_body" '.[] | select(.subject == "Ваш код подтверждения Aéza Security") | .body_text' | grep -oE -m1 '[0-9]{6}')
+get_code_from_user() {
+  read -r -p "Enter the confirmation code from the email message: " code
   log_message "INFO" "Confirmation code: $code"
 }
 
@@ -286,7 +270,7 @@ check_available_traffic() {
   available_traffic=$(process_json "$response" '.response.trafficLeft')
 
   if [[ "$available_traffic" -eq 0 ]]; then
-    log_message "ERROR" "No available traffic for $email"
+    log_message "ERROR" "No available traffic for $email. Possible rate-limited. Please try using another IP or email."
     exit 1
   fi
 
@@ -370,14 +354,13 @@ print_vless_key() {
 main() {
   log_message "INFO" "Script started"
   install_dependencies
-  clear_screen
-  select_location
+  get_email_from_user
   send_confirmation_code
-  wait_for_email_message
-  get_confirmation_code
+  get_code_from_user
   generate_device_id
   get_api_token
   check_available_traffic
+  select_location
   get_vless_key
   save_account_data
   upload_account_data
