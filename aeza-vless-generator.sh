@@ -309,8 +309,10 @@ decode_url() {
 get_vless_key() {
   local response
   local vless_key_raw
+  local location_lowercase
   log_message "INFO" "Getting VLESS key"
-  response=$(curl_request "$AEZA_API_ENDPOINT/vpn/connect" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --header "Aeza-Token: $api_token" --json "{\"location\": \"$option\"}")
+  location_lowercase=$(echo "$option" | tr '[:upper:]' '[:lower:]')
+  response=$(curl_request "$AEZA_API_ENDPOINT/vpn/connect" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --header "Aeza-Token: $api_token" --json "{\"location\": \"$location_lowercase\"}")
   vless_key_raw=$(process_json "$response" '.response.accessKey')
   vless_key=$(decode_url "$vless_key_raw")
   log_message "INFO" "Got VLESS key"
