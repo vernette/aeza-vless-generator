@@ -190,7 +190,7 @@ get_free_locations_list() {
   mapfile -t free_locations < <(process_json "$response" '.response | to_entries | map(select(.value.free == true)) | .[].key | ascii_upcase')
 }
 
-select_option() {
+select_location() {
   get_free_locations_list
   log_message "INFO" "Select an option. Available options: ${free_locations[*]} or choose 'random' to let the script choose for you"
   local options=("${free_locations[@]}" "random" "exit")
@@ -371,7 +371,7 @@ main() {
   log_message "INFO" "Script started"
   install_dependencies
   clear_screen
-  select_option
+  select_location
   send_confirmation_code
   wait_for_email_message
   get_confirmation_code
