@@ -339,10 +339,28 @@ save_account_data() {
 
 upload_account_data() {
   local download_url
-  log_message "INFO" "Uploading a file with account data to bashupload"
-  download_url=$(curl_request "https://bashupload.com" "POST" --file "$OUTPUT_DATA_FOLDER/$filename" | grep -oP 'https://bashupload\.com/\S+')
-  direct_download_url="$download_url?download=1"
-  log_message "INFO" "Successfully uploaded the account data file to bashupload"
+  local upload_file
+
+  log_message "INFO" "Would you like to upload a file with account data to bashupload? Useful when using remote servers."
+  select option in "Yes" "No"; do
+    case "$option" in
+      "Yes")
+        upload_file=true
+        break
+        ;;
+      "No")
+        upload_file=false
+        break
+        ;;
+    esac
+  done
+
+  if [[ "$upload_file" == true ]]; then
+    log_message "INFO" "Uploading a file with account data to bashupload"
+    download_url=$(curl_request "https://bashupload.com" "POST" --file "$OUTPUT_DATA_FOLDER/$filename" | grep -oP 'https://bashupload\.com/\S+')
+    direct_download_url="$download_url?download=1"
+    log_message "INFO" "Successfully uploaded the account data file to bashupload"
+  fi
 }
 
 print_vless_key() {
