@@ -214,7 +214,7 @@ select_location() {
 }
 
 get_email_from_user() {
-  read -r -p "Enter your email (A confirmation code will be sent to it. Please do not use temporary mail services): " email
+  read -r -p "Enter your email (A confirmation code will be sent to it. Please do not use temporary mail services): " email </dev/tty
   log_message "INFO" "Email: $email"
 }
 
@@ -244,7 +244,7 @@ send_confirmation_code() {
 }
 
 get_code_from_user() {
-  read -r -p "Enter the confirmation code from the email message: " code
+  read -r -p "Enter the confirmation code from the email message: " code </dev/tty
   log_message "INFO" "Confirmation code: $code"
 }
 
