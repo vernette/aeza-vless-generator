@@ -17,5 +17,3 @@ WORKDIR /app
 COPY aeza-vless-generator.sh .
 
 RUN chmod +x aeza-vless-generator.sh
-
-ENTRYPOINT ["bash", "./aeza-vless-generator.sh"]
