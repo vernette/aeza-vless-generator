@@ -115,6 +115,7 @@ git clone https://github.com/vernette/aeza-vless-generator.git
 cd aeza-vless-generator
 docker build -t aeza-vless-generator .
 docker run --rm -it aeza-vless-generator
+./aeza-vless-generator.sh
 ```
 
 ## Вклад в разработку
