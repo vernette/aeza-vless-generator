@@ -215,7 +215,7 @@ select_location() {
 
 get_email_from_user() {
   read -r -p "Enter your email (A confirmation code will be sent to it. Please do not use temporary mail services): " email </dev/tty
-  
+
   if [[ -z "$email" ]]; then
     log_message "ERROR" "Email cannot be empty"
     exit 1
@@ -341,7 +341,7 @@ upload_account_data() {
         break
         ;;
     esac
-  done
+  done </dev/tty
 
   if [[ "$upload_file" == true ]]; then
     log_message "INFO" "Uploading a file with account data to bashupload"
