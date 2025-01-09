@@ -36,7 +36,7 @@ Shell скрипт для автоматизации процесса получ
 
 #### Почты
 
-Для успешной генерации требуется трастовый email (google, mail.ru, yandex и т.д.), с временными почтами скрипт работать не будет.
+Для успешной генерации требуется трастовый email (google, mail.ru, yandex и т.д.), с временными почтами скрипт ~~работать не будет~~ работает.
 
 Если вы не хотите использовать свою почту, то можете воспользоваться сервисом `Kopeechka`: [реферальная ссылка](https://kopeechka.store/?ref=8331), [обычная](https://kopeechka.store/). 
 
@@ -111,10 +111,7 @@ wget -qO- https://raw.githubusercontent.com/vernette/aeza-vless-generator/master
 #### Docker
 
 ```bash
-git clone https://github.com/vernette/aeza-vless-generator.git
-cd aeza-vless-generator
-docker build -t aeza-vless-generator .
-docker run --rm -it aeza-vless-generator
+docker run -it ghcr.io/vernette/aeza-vless-generator:latest
 ./aeza-vless-generator.sh
 ```
 
