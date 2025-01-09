@@ -2,7 +2,7 @@
 
 DEPENDENCIES="curl openssl jq qrencode"
 AEZA_API_ENDPOINT="https://api.aeza-security.net/v2"
-USER_AGENT="okhttp/5.0.0-alpha.14"
+USER_AGENT="Dart/3.5 (dart:io)"
 LOG_FILE="log.txt"
 OUTPUT_DATA_FOLDER="output"
 
@@ -261,7 +261,7 @@ get_code_from_user() {
 
 generate_device_id() {
   log_message "INFO" "Generating device ID"
-  device_id=$(openssl rand -hex 8)
+  device_id=$(openssl rand -hex 8 | tr '[:lower:]' '[:upper:]')
   log_message "INFO" "Device ID: $device_id"
 }
 
