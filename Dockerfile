@@ -1,16 +1,11 @@
-FROM debian:bookworm-slim
+FROM alpine:3.21
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt update && \
-    apt install -y --no-install-recommends \
-    curl \
-    openssl \
-    jq \
-    qrencode \
-    ca-certificates && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache \
+  curl \
+  jq \
+  libqrencode-tools \
+  openssl \
+  bash
 
 WORKDIR /app
 
