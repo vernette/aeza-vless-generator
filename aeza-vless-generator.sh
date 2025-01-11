@@ -214,7 +214,7 @@ select_location() {
 }
 
 get_email_from_user() {
-  read -r -p "Enter your email (A confirmation code will be sent to it. Please do not use temporary mail services): " email </dev/tty
+  read -r -p "Enter your email (A confirmation code will be sent to it): " email </dev/tty
 
   if [[ -z "$email" ]]; then
     log_message "ERROR" "Email cannot be empty"
@@ -293,6 +293,15 @@ decode_url() {
   printf '%b' "${url_encoded//%/\\x}"
 }
 
+rename_vless_key() {
+  local key="$1"
+  local key_name
+  local timestamp
+  timestamp=$(get_timestamp "%d.%m.%Y")
+  key_name="AEZA-${option}-${timestamp}"
+  echo "${key%#*}#${key_name}"
+}
+
 get_vless_key() {
   local response
   local vless_key_raw
@@ -301,7 +310,8 @@ get_vless_key() {
   location_lowercase=$(echo "$option" | tr '[:upper:]' '[:lower:]')
   response=$(curl_request "$AEZA_API_ENDPOINT/vpn/connect" "POST" --user-agent "$USER_AGENT" --header "Device-Id: $device_id" --header "Aeza-Token: $api_token" --json "{\"location\": \"$location_lowercase\"}")
   vless_key_raw=$(process_json "$response" '.response.accessKey')
-  vless_key=$(decode_url "$vless_key_raw")
+  vless_key_original=$(decode_url "$vless_key_raw")
+  vless_key=$(rename_vless_key "$vless_key_original")
   log_message "INFO" "Got VLESS key"
 }
 
