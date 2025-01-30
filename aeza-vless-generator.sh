@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 DEPENDENCIES="curl openssl jq qrencode"
+EMAIL_API_ENDPOINT="https://api.internal.temp-mail.io/api/v3/email"
 AEZA_API_ENDPOINT="https://api.aeza-security.net/v2"
 USER_AGENT="Dart/3.5 (dart:io)"
 LOG_FILE="log.txt"
@@ -213,6 +214,32 @@ select_location() {
   log_message "INFO" "Selected option: $option"
 }
 
+ask_for_email() {
+  log_message "INFO" "Would you like to use a temporary email? (Recommended). Otherwise, enter your email manually"
+  select option in "Yes" "No"; do
+    case "$option" in
+      "Yes")
+        email_mode="temporary"
+        get_temporary_email
+        break
+        ;;
+      "No")
+        email_mode="manual"
+        get_email_from_user
+        break
+        ;;
+    esac
+  done </dev/tty
+}
+
+get_temporary_email() {
+  local response
+  log_message "INFO" "Getting temporary email"
+  response=$(curl_request "$EMAIL_API_ENDPOINT/new" "POST")
+  email=$(process_json "$response" '.email')
+  log_message "INFO" "Email: $email"
+}
+
 get_email_from_user() {
   read -r -p "Enter your email (A confirmation code will be sent to it): " email </dev/tty
 
@@ -249,6 +276,33 @@ send_confirmation_code() {
   esac
 }
 
+wait_for_email_message() {
+  local max_attempts=10
+  local attempt_timeout=10
+  local attempt=0
+
+  while [[ $attempt -lt $max_attempts ]]; do
+    ((attempt++))
+    log_message "INFO" "Attempt $attempt: Checking for messages..."
+    email_response_body=$(curl_request "$EMAIL_API_ENDPOINT/$email/messages" "GET")
+    if [[ "$email_response_body" != "[]" ]]; then
+      return
+    fi
+    log_message "INFO" "No messages yet, sleeping for $attempt_timeout seconds"
+    sleep "$attempt_timeout"
+    attempt_timeout=$((attempt_timeout * 2))
+  done
+
+  log_message "ERROR" "Failed to receive a message"
+  exit 1
+}
+
+get_confirmation_code_from_temporary_email() {
+  log_message "INFO" "Getting confirmation code"
+  code=$(process_json "$email_response_body" '.[] | select(.subject == "Ваш код подтверждения Aéza Security") | .body_text' | grep -oE -m1 '[0-9]{6}')
+  log_message "INFO" "Confirmation code: $code"
+}
+
 get_code_from_user() {
   while true; do
     read -r -p "Enter the confirmation code from the email message: " code </dev/tty
@@ -257,6 +311,15 @@ get_code_from_user() {
     fi
   done
   log_message "INFO" "Confirmation code: $code"
+}
+
+get_code() {
+  if [[ "$email_mode" == "temporary" ]]; then
+    wait_for_email_message
+    get_confirmation_code_from_temporary_email
+  else
+    get_code_from_user
+  fi
 }
 
 generate_device_id() {
@@ -375,9 +438,9 @@ print_vless_key() {
 main() {
   log_message "INFO" "Script started"
   install_dependencies
-  get_email_from_user
+  ask_for_email
   send_confirmation_code
-  get_code_from_user
+  get_code
   generate_device_id
   get_api_token
   check_available_traffic
