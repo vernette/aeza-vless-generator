@@ -6,13 +6,9 @@
 ## Быстрый старт
 
 ```bash
-# Через curl
-curl -s https://raw.githubusercontent.com/vernette/aeza-vless-generator/master/aeza-vless-generator.sh | bash
+bash <(wget -qO - https://github.com/vernette/aeza-vless-generator/raw/master/aeza-vless-generator.sh)
 
-# Через wget
-wget -qO- https://raw.githubusercontent.com/vernette/aeza-vless-generator/master/aeza-vless-generator.sh | bash
-
-# Через Docker
+# Docker
 docker run -it ghcr.io/vernette/aeza-vless-generator:latest
 ./aeza-vless-generator.sh
 ```
@@ -27,6 +23,7 @@ docker run -it ghcr.io/vernette/aeza-vless-generator:latest
 | openssl  | Генерация уникальных id  |
 
 Автоматическая установка зависимостей поддерживается для:
+
 - Debian
 - Ubuntu
 - Arch Linux
@@ -37,22 +34,27 @@ docker run -it ghcr.io/vernette/aeza-vless-generator:latest
 ## Особенности использования
 
 ### Ограничения
+
 - На один email можно получить максимум 5 ключей
 - Для получения нового ключа требуется перезапуск скрипта
 
 ### Требования к почте
+
 Рекомендуется использовать почту от известных провайдеров (Google, Mail.ru, Yandex и т.д.).
 
 Если не хотите использовать личную почту, можно воспользоваться сервисом [Kopeechka](https://kopeechka.store/) или выбрать режим регистрации на временную почту.
 
 ### Использование прокси
+
 Если возникают проблемы с доступом, рекомендуется использовать прокси (поддерживаются IPv4 и IPv6).
 
 Рекомендуемые сервисы:
+
 - proxy.family: IPv6 прокси от 0.26 руб. ([сайт](https://proxy.family/))
 - PROXY6: IPv6 прокси от 2.88 руб. ([сайт](https://proxy6.net/))
 
 Настройка прокси:
+
 ```bash
 # Установка прокси
 export https_proxy=protocol://login:password@ip:port
@@ -73,6 +75,7 @@ unset https_proxy
 ## Результаты работы
 
 После выполнения скрипт:
+
 1. Создаст лог-файл `log.txt` с информацией о процессе
 2. Создаст директорию `output` с JSON-файлом, содержащим:
    - Email
@@ -89,10 +92,12 @@ unset https_proxy
 ## Разработка
 
 Если у вас есть предложения по улучшению или вы нашли баг:
+
 - Создайте [issue](https://github.com/vernette/aeza-vless-generator/issues)
 - Отправьте [pull request](https://github.com/vernette/aeza-vless-generator/pulls)
 
 ## Планы развития
+
 - [ ] Менеджер аккаунтов
 - [x] Поддержка прокси
 - [ ] Определение типа аккаунта и доступных локаций
