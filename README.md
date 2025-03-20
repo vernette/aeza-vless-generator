@@ -7,8 +7,11 @@
 
 ```bash
 bash <(wget -qO - https://github.com/vernette/aeza-vless-generator/raw/master/aeza-vless-generator.sh)
+```
 
-# Docker
+### Docker
+
+```bash
 docker run -it ghcr.io/vernette/aeza-vless-generator:latest
 ./aeza-vless-generator.sh
 ```
